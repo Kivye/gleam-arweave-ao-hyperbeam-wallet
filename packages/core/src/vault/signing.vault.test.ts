@@ -435,6 +435,32 @@ describe("vault/signing", () => {
       expect((await plan(10, true, "1")).kind).toBe("transaction");
     });
 
+    it.each(["0e0", " 1", "1 ", "-1", "+1", "0x1", "1.0", "1_000", "0.0"])(
+      "plans a base transaction for the malformed quantity %j",
+      async (quantity) => {
+        expect((await plan(10, true, quantity)).kind).toBe("transaction");
+      },
+    );
+
+    it.each(["0", "00", "", " 0 ", undefined])("may bundle the zero quantity %j", async (quantity) => {
+      expect((await plan(10, true, quantity)).kind).toBe("dataItem");
+    });
+
+    it("keeps a token-transfer-shaped dispatch on L1 even with data", async () => {
+      const tags = [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: "a".repeat(43) },
+        { name: "quantity", value: "5" },
+      ];
+      const unsigned = await prepareDispatch(
+        "https://arweave.net",
+        jwk.n,
+        { data: bytesToBase64(new Uint8Array(10).fill(3)), quantity: "0", target: "c".repeat(43), tags, reward: "1", last_tx: "b".repeat(64) },
+        { viaBundler: true },
+      );
+      expect(unsigned.kind).toBe("transaction");
+    });
+
     it("plans an empty transaction when the dApp sends no data to the gateway", async () => {
       const unsigned = await prepareDispatch("https://arweave.net", jwk.n, { reward: "1", last_tx: "b".repeat(64) }, { viaBundler: false });
       expect(unsigned).toMatchObject({ kind: "transaction", transaction: { data: "", data_size: "0", quantity: "0" } });
